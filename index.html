@@ -505,10 +505,11 @@ function parseSheet(table) {
 
     // 12 hourly slots, each has 2 columns: [VTCS tons, Manual KG]
     const hourly = HOURS.map((label, h) => {
-        // Sheet uses merged header rows; gviz inserts null spacers →
-        // actual layout per hour is (VTCS, null, Manual, null) = 4 gviz cols each
-        const vtcsCol   = 1 + h * 4;
-        const manualCol = 3 + h * 4;
+        // Sheet now has all columns populated: standard 2-col-per-hour layout
+        // VTCS at col 1,3,5,7... → 1 + h*2
+        // Manual(KG) at col 2,4,6,8... → 2 + h*2
+        const vtcsCol   = 1 + h * 2;
+        const manualCol = 2 + h * 2;
         let sumVtcs = 0, sumManualTons = 0;
         let hasData = false;
 
