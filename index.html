@@ -413,7 +413,7 @@
 
     <!-- ── Table ── -->
     <div class="table-card">
-        <h2>Per-Tehsil Breakdown — Total Tonnage</h2>
+        <h2>Per-Tehsil Breakdown — Current Hour / Previous Hours / Total Collected</h2>
         <div id="tableWrap">
             <div class="loading"><div class="spinner"></div>Loading sheet data…</div>
         </div>
@@ -751,50 +751,60 @@ function renderTehsilChart(tehsilTotals) {
 }
 
 /* ── Table ── */
-function renderTable(tehsilTotals) {
-    const grand = tehsilTotals.reduce((s, t) => s + t.total, 0);
-    const grandVtcs = tehsilTotals.reduce((s, t) => s + t.vtcs, 0);
-    const grandMan  = tehsilTotals.reduce((s, t) => s + t.manual, 0);
+function renderTable(tehsilTotals, hourly) {
+    const ci  = currentHourIdx(hourly);
+    const cur = hourly[ci];
 
-    const rows = tehsilTotals.map((t, i) => {
-        const pct = grand > 0 ? (t.total / grand * 100) : 0;
-        return `<tr>
-            <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${PALETTE[i % PALETTE.length]};margin-right:8px;vertical-align:middle"></span><strong>${t.name}</strong></td>
-            <td>${t.vtcs.toFixed(4)}</td>
-            <td>${(t.vtcs * 1000).toFixed(1)} KG</td>
-            <td>${t.manual.toFixed(4)}</td>
-            <td>${(t.manual * 1000).toFixed(1)} KG</td>
-            <td><strong>${t.total.toFixed(4)}</strong></td>
-            <td>${pct.toFixed(1)}%</td>
-            <td><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
-        </tr>`;
-    }).join('');
+    // Build per-tehsil current-hour / previous-hours / total breakdown
+    const tehsilData = tehsilTotals.map((t, i) => {
+        const curVtcs  = cur.byTehsil[i].vtcs;
+        const curMan   = cur.byTehsil[i].manual;
+        const prevVtcs = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].vtcs,   0);
+        const prevMan  = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].manual, 0);
+        return { name: t.name, curVtcs, curMan, prevVtcs, prevMan, totVtcs: t.vtcs, totMan: t.manual };
+    });
+
+    // Footer totals
+    const ftCurVtcs  = tehsilData.reduce((s, t) => s + t.curVtcs,  0);
+    const ftCurMan   = tehsilData.reduce((s, t) => s + t.curMan,   0);
+    const ftPrevVtcs = tehsilData.reduce((s, t) => s + t.prevVtcs, 0);
+    const ftPrevMan  = tehsilData.reduce((s, t) => s + t.prevMan,  0);
+    const ftTotVtcs  = tehsilData.reduce((s, t) => s + t.totVtcs,  0);
+    const ftTotMan   = tehsilData.reduce((s, t) => s + t.totMan,   0);
+
+    const rows = tehsilData.map((t, i) => `<tr>
+        <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${PALETTE[i % PALETTE.length]};margin-right:8px;vertical-align:middle"></span><strong>${t.name}</strong></td>
+        <td style="color:var(--green)">${t.curVtcs.toFixed(4)}</td>
+        <td style="color:var(--orange)">${t.curMan.toFixed(4)}</td>
+        <td style="color:var(--accent)">${t.prevVtcs.toFixed(4)}</td>
+        <td style="color:#f59e0b">${t.prevMan.toFixed(4)}</td>
+        <td style="color:var(--yellow)">${t.totVtcs.toFixed(4)}</td>
+        <td style="color:var(--purple)">${t.totMan.toFixed(4)}</td>
+    </tr>`).join('');
 
     document.getElementById('tableWrap').innerHTML = `
     <table>
         <thead>
             <tr>
                 <th>Tehsil</th>
-                <th>VTCS (tons)</th>
-                <th>VTCS (KG)</th>
-                <th>Manual (tons)</th>
-                <th>Manual (KG)</th>
-                <th>Total (tons)</th>
-                <th>Share %</th>
-                <th></th>
+                <th style="color:var(--green)">Cur. Hour VTCS (t)</th>
+                <th style="color:var(--orange)">Cur. Hour Manual (t)</th>
+                <th style="color:var(--accent)">Prev. Hours VTCS (t)</th>
+                <th style="color:#f59e0b">Prev. Hours Manual (t)</th>
+                <th style="color:var(--yellow)">Total VTCS (t)</th>
+                <th style="color:var(--purple)">Total Manual (t)</th>
             </tr>
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
             <tr>
-                <td>Grand Total</td>
-                <td>${grandVtcs.toFixed(4)}</td>
-                <td>${(grandVtcs * 1000).toFixed(1)} KG</td>
-                <td>${grandMan.toFixed(4)}</td>
-                <td>${(grandMan * 1000).toFixed(1)} KG</td>
-                <td>${grand.toFixed(4)}</td>
-                <td>100%</td>
-                <td></td>
+                <td><strong>Grand Total</strong></td>
+                <td><strong>${ftCurVtcs.toFixed(4)}</strong></td>
+                <td><strong>${ftCurMan.toFixed(4)}</strong></td>
+                <td><strong>${ftPrevVtcs.toFixed(4)}</strong></td>
+                <td><strong>${ftPrevMan.toFixed(4)}</strong></td>
+                <td><strong>${ftTotVtcs.toFixed(4)}</strong></td>
+                <td><strong>${ftTotMan.toFixed(4)}</strong></td>
             </tr>
         </tfoot>
     </table>`;
@@ -821,7 +831,7 @@ async function loadData() {
         renderCumul(hourly);
         renderStacked(hourly);
         renderTehsilChart(tehsilTotals);
-        renderTable(tehsilTotals);
+        renderTable(tehsilTotals, hourly);
 
         const now = new Date();
         document.getElementById('lastUpdated').textContent =
