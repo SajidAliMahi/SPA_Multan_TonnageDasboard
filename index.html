@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Waste Collection Dashboard — Eid Day 1</title>
+    <title>Waste Collection Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
@@ -296,7 +296,7 @@
     <!-- ── Header ── -->
     <header>
         <div class="header-left">
-            <h1>🗑️ Waste Collection Dashboard — Eid Day 1</h1>
+            <h1 id="mainTitle">🗑️ Waste Collection Dashboard</h1>
             <p>Multan District &nbsp;•&nbsp; Live data from Google Sheets &nbsp;•&nbsp; Auto-refresh every 5 min</p>
         </div>
         <div class="header-right">
@@ -422,6 +422,30 @@
 </div><!-- /container -->
 
 <script>
+/* ──────────────────────────────────────────
+   EID DAY LABEL  (auto-updates by date)
+──────────────────────────────────────────── */
+const EID_DAYS = {
+    '2026-05-27': 'Eid Day 1',
+    '2026-05-28': 'Eid Day 2',
+    '2026-05-29': 'Eid Day 3',
+};
+
+function getEidLabel() {
+    const today = new Date();
+    const key   = today.getFullYear() + '-'
+                + String(today.getMonth() + 1).padStart(2, '0') + '-'
+                + String(today.getDate()).padStart(2, '0');
+    return EID_DAYS[key] || null;
+}
+
+function applyEidTitle() {
+    const label = getEidLabel();
+    const suffix = label ? ` — ${label}` : '';
+    document.getElementById('mainTitle').textContent = `🗑️ Waste Collection Dashboard${suffix}`;
+    document.title = `Waste Collection Dashboard${suffix}`;
+}
+
 /* ──────────────────────────────────────────
    CONFIG
 ──────────────────────────────────────────── */
@@ -849,6 +873,7 @@ async function loadData() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    applyEidTitle();
     loadData();
     setInterval(loadData, 5 * 60 * 1000);   // auto-refresh every 5 minutes
 });
