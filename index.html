@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waste Collection Dashboard — Eid Day 1</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #060d1a;
+            --surface: #0d1b2e;
+            --card: #0f2340;
+            --border: #1a3455;
+            --accent: #00d4ff;
+            --green: #00f5a0;
+            --yellow: #ffd700;
+            --orange: #ff8c00;
+            --purple: #a78bfa;
+            --text: #dde8f0;
+            --muted: #5a7d99;
+            --dim: rgba(255,255,255,0.06);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: var(--bg);
+            background-image:
+                radial-gradient(ellipse 80% 50% at 10% 0%, rgba(0,212,255,0.06) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 60% at 90% 100%, rgba(0,245,160,0.04) 0%, transparent 60%);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+        }
+        .container { max-width: 1440px; margin: 0 auto; padding: 24px 28px; }
+
+        /* ── Header ── */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .header-left h1 {
+            font-size: 1.55rem;
+            font-weight: 700;
+            background: linear-gradient(120deg, var(--accent) 0%, var(--green) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+        .header-left p { font-size: 0.8rem; color: var(--muted); margin-top: 5px; }
+        .header-right { text-align: right; }
+        .header-right #currentDate { font-size: 0.85rem; color: var(--text); font-weight: 600; }
+        .header-right #lastUpdated { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+        .btn-refresh {
+            margin-top: 10px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--accent);
+            padding: 7px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-family: inherit;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .btn-refresh:hover { background: var(--border); border-color: var(--accent); }
+
+        /* ── Error ── */
+        .error-box {
+            background: rgba(248,113,113,0.08);
+            border: 1px solid rgba(248,113,113,0.3);
+            border-radius: 10px;
+            padding: 14px 20px;
+            color: #fca5a5;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        /* ── KPI Grid ── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+        @media (max-width: 960px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+        .kpi-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px 22px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.18s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); }
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+        .kpi-card.c-blue::before  { background: linear-gradient(90deg, var(--accent), #0088cc); }
+        .kpi-card.c-green::before { background: linear-gradient(90deg, var(--green), #00b37a); }
+        .kpi-card.c-yellow::before{ background: linear-gradient(90deg, var(--yellow), #cc9900); }
+        .kpi-card.c-orange::before{ background: linear-gradient(90deg, var(--orange), #cc5500); }
+        .kpi-icon { font-size: 1.4rem; margin-bottom: 10px; }
+        .kpi-label {
+            font-size: 0.68rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+        }
+        .kpi-value {
+            font-size: 2.1rem;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: -0.03em;
+        }
+        .kpi-value.blue   { color: var(--accent); }
+        .kpi-value.green  { color: var(--green); }
+        .kpi-value.yellow { color: var(--yellow); }
+        .kpi-value.orange { color: var(--orange); }
+        .kpi-unit { font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
+        .kpi-sub  { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+        .kpi-breakdown {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-top: 8px;
+        }
+        .kpi-breakdown span {
+            font-size: 0.72rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .kpi-breakdown .bd-label { color: var(--muted); }
+        .kpi-breakdown .bd-val   { color: var(--text); font-weight: 600; }
+        .kpi-breakdown .bd-sep   { border-top: 1px solid var(--border); margin: 3px 0; }
+
+        /* ── EID Day grid (3-col) ── */
+        .eid-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+        @media (max-width: 800px) { .eid-grid { grid-template-columns: 1fr; } }
+        .kpi-card.c-purple::before { background: linear-gradient(90deg, var(--purple), #7c3aed); }
+        .kpi-value.purple { color: var(--purple); }
+        .kpi-day-badge {
+            display: inline-block;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-bottom: 6px;
+        }
+        .badge-d1 { background: rgba(0,212,255,0.15); color: var(--accent); border: 1px solid rgba(0,212,255,0.3); }
+        .badge-d2 { background: rgba(0,245,160,0.15); color: var(--green);  border: 1px solid rgba(0,245,160,0.3); }
+        .badge-d3 { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+        .kpi-card.c-blue2::before  { background: linear-gradient(90deg, #0ea5e9, #0369a1); }
+        .kpi-value.blue2 { color: #38bdf8; }
+
+        /* ── Section label ── */
+        .section-label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
+        /* ── Charts layout ── */
+        .charts-row {
+            display: grid;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+        .charts-row-1 { grid-template-columns: 3fr 2fr; }
+        .charts-row-2 { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 1100px) {
+            .charts-row-1, .charts-row-2 { grid-template-columns: 1fr; }
+        }
+        .chart-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px 22px;
+        }
+        .chart-card h2 {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 16px;
+        }
+        .chart-wrap { position: relative; height: 260px; }
+
+        /* ── Table ── */
+        .table-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px 22px;
+            overflow-x: auto;
+            margin-top: 16px;
+        }
+        .table-card h2 {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 16px;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+        thead th {
+            text-align: left;
+            padding: 9px 14px;
+            font-size: 0.66rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+            white-space: nowrap;
+        }
+        tbody td { padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: rgba(0,212,255,0.04); }
+        tfoot td {
+            padding: 11px 14px;
+            border-top: 1px solid var(--border);
+            font-weight: 600;
+            background: rgba(255,255,255,0.03);
+        }
+        .bar-bg {
+            display: inline-block;
+            background: rgba(255,255,255,0.08);
+            height: 6px;
+            border-radius: 3px;
+            width: 90px;
+            vertical-align: middle;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--green));
+        }
+        .tag {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .tag-current { background: rgba(0,245,160,0.15); color: var(--green); border: 1px solid rgba(0,245,160,0.3); }
+        .tag-prev    { background: rgba(0,212,255,0.1);  color: var(--accent); border: 1px solid rgba(0,212,255,0.25); }
+
+        /* ── Spinner ── */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 240px;
+            color: var(--muted);
+            font-size: 0.9rem;
+            gap: 12px;
+        }
+        .spinner {
+            width: 28px; height: 28px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ── Header ── -->
+    <header>
+        <div class="header-left">
+            <h1>🗑️ Waste Collection Dashboard — Eid Day 1</h1>
+            <p>Multan District &nbsp;•&nbsp; Live data from Google Sheets &nbsp;•&nbsp; Auto-refresh every 5 min</p>
+        </div>
+        <div class="header-right">
+            <div id="currentDate">—</div>
+            <div id="lastUpdated">Fetching data…</div>
+            <button class="btn-refresh" onclick="loadData()">↻ Refresh Now</button>
+        </div>
+    </header>
+
+    <div id="errorBox" class="error-box"></div>
+
+    <!-- ── EID Daily Totals ── -->
+    <div class="section-label">Eid Collection — Daily Totals</div>
+    <div class="eid-grid">
+        <div class="kpi-card c-blue">
+            <div class="kpi-day-badge badge-d1">EID Day-1</div>
+            <div class="kpi-label">Total Waste Collected</div>
+            <div class="kpi-value blue" id="kDay1Total">—</div>
+            <div class="kpi-unit">tons</div>
+            <div class="kpi-breakdown">
+                <div class="bd-sep"></div>
+                <span><span class="bd-label">VTCS</span><span class="bd-val" id="kDay1Vtcs">— t</span></span>
+                <span><span class="bd-label">Manual</span><span class="bd-val" id="kDay1Man">— t</span></span>
+            </div>
+        </div>
+        <div class="kpi-card c-green">
+            <div class="kpi-day-badge badge-d2">EID Day-2</div>
+            <div class="kpi-label">Total Waste Collected</div>
+            <div class="kpi-value green" id="kDay2Total">—</div>
+            <div class="kpi-unit">tons</div>
+            <div class="kpi-breakdown">
+                <div class="bd-sep"></div>
+                <span><span class="bd-label">VTCS</span><span class="bd-val" id="kDay2Vtcs">— t</span></span>
+                <span><span class="bd-label">Manual</span><span class="bd-val" id="kDay2Man">— t</span></span>
+            </div>
+        </div>
+        <div class="kpi-card c-purple">
+            <div class="kpi-day-badge badge-d3">EID Day-3</div>
+            <div class="kpi-label">Total Waste Collected</div>
+            <div class="kpi-value purple" id="kDay3Total">—</div>
+            <div class="kpi-unit">tons</div>
+            <div class="kpi-breakdown">
+                <div class="bd-sep"></div>
+                <span><span class="bd-label">VTCS</span><span class="bd-val" id="kDay3Vtcs">— t</span></span>
+                <span><span class="bd-label">Manual</span><span class="bd-val" id="kDay3Man">— t</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── KPI Cards ── -->
+    <div class="section-label">Tonnage Summary</div>
+    <div class="kpi-grid">
+        <div class="kpi-card c-blue">
+            <div class="kpi-icon">🕐</div>
+            <div class="kpi-label">Current Hour</div>
+            <div class="kpi-value blue" id="kCurLabel">—</div>
+            <div class="kpi-sub" id="kCurSub">detecting…</div>
+        </div>
+        <div class="kpi-card c-green">
+            <div class="kpi-icon">⚡</div>
+            <div class="kpi-label">Current Hour Total</div>
+            <div class="kpi-value green" id="kCurTotal">—</div>
+            <div class="kpi-breakdown">
+                <div class="bd-sep"></div>
+                <span><span class="bd-label">VTCS</span><span class="bd-val" id="kCurVtcs">— t</span></span>
+                <span><span class="bd-label">Manual</span><span class="bd-val" id="kCurMan">— t</span></span>
+            </div>
+        </div>
+        <div class="kpi-card c-yellow">
+            <div class="kpi-icon">📈</div>
+            <div class="kpi-label">Previous Hours (Accumulative)</div>
+            <div class="kpi-value yellow" id="kPrevTotal">—</div>
+            <div class="kpi-breakdown">
+                <div class="bd-sep"></div>
+                <span><span class="bd-label">VTCS</span><span class="bd-val" id="kPrevVtcs">— t</span></span>
+                <span><span class="bd-label">Manual</span><span class="bd-val" id="kPrevMan">— t</span></span>
+            </div>
+        </div>
+        <div class="kpi-card c-orange">
+            <div class="kpi-icon">🏆</div>
+            <div class="kpi-label">Total Collected</div>
+            <div class="kpi-value orange" id="kGrandTotal">—</div>
+            <div class="kpi-breakdown">
+                <div class="bd-sep"></div>
+                <span><span class="bd-label">VTCS</span><span class="bd-val" id="kGrandVtcs">— t</span></span>
+                <span><span class="bd-label">Manual</span><span class="bd-val" id="kGrandMan">— t</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Row 1 charts ── -->
+    <div class="charts-row charts-row-1">
+        <div class="chart-card">
+            <h2>Hourly Collection (tons) — Current hour highlighted</h2>
+            <div class="chart-wrap"><canvas id="cHourly"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <h2>Cumulative Tonnage Over Day</h2>
+            <div class="chart-wrap"><canvas id="cCumul"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ── Row 2 charts ── -->
+    <div class="charts-row charts-row-2">
+        <div class="chart-card">
+            <h2>VTCS (tons) vs Manual (tons) — Stacked per Hour</h2>
+            <div class="chart-wrap"><canvas id="cStacked"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <h2>Tehsil-wise Share of Total Collection</h2>
+            <div class="chart-wrap"><canvas id="cTehsil"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ── Table ── -->
+    <div class="table-card">
+        <h2>Per-Tehsil Breakdown — Total Tonnage</h2>
+        <div id="tableWrap">
+            <div class="loading"><div class="spinner"></div>Loading sheet data…</div>
+        </div>
+    </div>
+
+</div><!-- /container -->
+
+<script>
+/* ──────────────────────────────────────────
+   CONFIG
+──────────────────────────────────────────── */
+const SHEET_ID = '1x0gZH0z2Z9D4KAzXV7AgZVN6B9uh4NvfZYrm3hp_m7w';
+
+const HOURS = [
+    '10 AM','11 AM','12 PM','1 PM',
+    '2 PM','3 PM','4 PM','5 PM',
+    '6 PM','7 PM','8 PM','9 PM'
+];
+const HOUR_24 = [10,11,12,13,14,15,16,17,18,19,20,21];
+
+const PALETTE = ['#00d4ff','#00f5a0','#ffd700','#ff8c00','#a78bfa'];
+let charts = {};
+
+/* ──────────────────────────────────────────
+   FETCH + PARSE
+──────────────────────────────────────────── */
+async function fetchSheet(sheetName) {
+    const param = sheetName ? `&sheet=${encodeURIComponent(sheetName)}` : '';
+    const url   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json${param}`;
+    const res   = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text  = await res.text();
+    const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+    if (!m) throw new Error('Unexpected response format from Google Sheets');
+    return JSON.parse(m[1]).table;
+}
+
+/* ── Sheet2: 3-day summary ── */
+function parseSheet2(table) {
+    const rows = table.rows || [];
+    // Use the Hourly Total row for pre-summed values; fall back to summing tehsil rows
+    const totalRow = rows.find(r => r.c?.[0]?.v === 'Hourly Total');
+    const dataRows = rows.filter(r => { const n = r.c?.[0]?.v; return n && n !== 'Hourly Total'; });
+
+    return [0, 1, 2].map(d => {
+        const vtcsCol = 1 + d * 2;   // Day1→col1, Day2→col3, Day3→col5
+        const manCol  = 2 + d * 2;   // Day1→col2, Day2→col4, Day3→col6
+        let vtcs, manKg;
+        if (totalRow) {
+            vtcs  = cellVal(totalRow, vtcsCol);
+            manKg = cellVal(totalRow, manCol);
+        } else {
+            vtcs  = dataRows.reduce((s, r) => s + cellVal(r, vtcsCol), 0);
+            manKg = dataRows.reduce((s, r) => s + cellVal(r, manCol),  0);
+        }
+        return { vtcs, manKg, manual: manKg / 1000, total: vtcs + manKg / 1000 };
+    });
+}
+
+function renderEidDays(days) {
+    days.forEach((day, i) => {
+        const n = i + 1;
+        const hasData = day.vtcs > 0 || day.manKg > 0;
+        document.getElementById(`kDay${n}Total`).textContent =
+            hasData ? day.total.toFixed(3) : '—';
+        document.getElementById(`kDay${n}Vtcs`).textContent =
+            hasData ? day.vtcs.toFixed(3) + ' t' : 'No data yet';
+        document.getElementById(`kDay${n}Man`).textContent  =
+            hasData ? day.manual.toFixed(4) + ' t  (' + day.manKg.toFixed(1) + ' KG)' : 'No data yet';
+    });
+}
+
+function cellVal(row, idx) {
+    const c = row.c?.[idx];
+    if (!c || c.v === null || c.v === undefined) return 0;
+    return parseFloat(c.v) || 0;
+}
+
+function parseSheet(table) {
+    const rows = table.rows || [];
+
+    // Skip the "Hourly Total" summary row
+    const tehsilRows = rows.filter(r => {
+        const n = r.c?.[0]?.v;
+        return n && n !== 'Hourly Total';
+    });
+
+    const tehsilNames = tehsilRows.map(r => r.c[0].v);
+
+    // 12 hourly slots, each has 2 columns: [VTCS tons, Manual KG]
+    const hourly = HOURS.map((label, h) => {
+        // Sheet uses merged header rows; gviz inserts null spacers →
+        // actual layout per hour is (VTCS, null, Manual, null) = 4 gviz cols each
+        const vtcsCol   = 1 + h * 4;
+        const manualCol = 3 + h * 4;
+        let sumVtcs = 0, sumManualTons = 0;
+        let hasData = false;
+
+        const byTehsil = tehsilRows.map((row, i) => {
+            const vtcs     = cellVal(row, vtcsCol);
+            const manualKg = cellVal(row, manualCol);
+            if (vtcs > 0 || manualKg > 0) hasData = true;
+            const manualTons = manualKg / 1000;
+            sumVtcs       += vtcs;
+            sumManualTons += manualTons;
+            return { name: tehsilNames[i], vtcs, manual: manualTons, total: vtcs + manualTons };
+        });
+
+        return {
+            label,
+            vtcs: sumVtcs,
+            manual: sumManualTons,
+            total: sumVtcs + sumManualTons,
+            hasData,
+            byTehsil
+        };
+    });
+
+    // Aggregate per-tehsil across all hours
+    const tehsilTotals = tehsilNames.map((name, ti) => {
+        let vtcs = 0, manual = 0;
+        hourly.forEach(h => { vtcs += h.byTehsil[ti].vtcs; manual += h.byTehsil[ti].manual; });
+        return { name, vtcs, manual, total: vtcs + manual };
+    });
+
+    return { tehsilNames, hourly, tehsilTotals };
+}
+
+/* ──────────────────────────────────────────
+   CURRENT HOUR DETECTION
+──────────────────────────────────────────── */
+function currentHourIdx(hourly) {
+    // Prefer wall-clock time if within operating window
+    const h = new Date().getHours();
+    for (let i = HOUR_24.length - 1; i >= 0; i--) {
+        if (h >= HOUR_24[i]) return i;
+    }
+    // Fallback: last slot with data
+    let last = 0;
+    hourly.forEach((slot, i) => { if (slot.hasData) last = i; });
+    return last;
+}
+
+/* ──────────────────────────────────────────
+   KPI CARDS
+──────────────────────────────────────────── */
+function renderKPIs(hourly) {
+    const ci       = currentHourIdx(hourly);
+    const cur      = hourly[ci];
+
+    // Previous = all completed hours before current
+    const prevVtcs = hourly.slice(0, ci).reduce((s, h) => s + h.vtcs, 0);
+    const prevMan  = hourly.slice(0, ci).reduce((s, h) => s + h.manual, 0);
+    const prevTons = prevVtcs + prevMan;
+
+    // Grand total
+    const grandVtcs = hourly.reduce((s, h) => s + h.vtcs, 0);
+    const grandMan  = hourly.reduce((s, h) => s + h.manual, 0);
+    const grandTon  = grandVtcs + grandMan;
+
+    // ── Current Hour card ──
+    document.getElementById('kCurLabel').textContent = HOURS[ci];
+    document.getElementById('kCurSub').textContent   =
+        `Slot ${ci + 1} / ${HOURS.length}  •  ${cur.hasData ? 'Data received' : 'Awaiting data'}`;
+    document.getElementById('kCurTotal').textContent = cur.total.toFixed(3);
+    document.getElementById('kCurVtcs').textContent  = cur.vtcs.toFixed(3) + ' t';
+    document.getElementById('kCurMan').textContent   = cur.manual.toFixed(4) + ' t  (' + (cur.manual * 1000).toFixed(1) + ' KG)';
+
+    // ── Previous Hours card ──
+    document.getElementById('kPrevTotal').textContent = prevTons.toFixed(3);
+    document.getElementById('kPrevVtcs').textContent  = prevVtcs.toFixed(3) + ' t';
+    document.getElementById('kPrevMan').textContent   = prevMan.toFixed(4) + ' t  (' + (prevMan * 1000).toFixed(1) + ' KG)';
+
+    // ── Grand Total card ──
+    document.getElementById('kGrandTotal').textContent = grandTon.toFixed(3);
+    document.getElementById('kGrandVtcs').textContent  = grandVtcs.toFixed(3) + ' t';
+    document.getElementById('kGrandMan').textContent   = grandMan.toFixed(4) + ' t  (' + (grandMan * 1000).toFixed(1) + ' KG)';
+
+    // EID Day cards are populated separately by renderEidDays() from Sheet2
+}
+
+/* ──────────────────────────────────────────
+   CHART HELPERS
+──────────────────────────────────────────── */
+const GRID_CLR  = 'rgba(255,255,255,0.06)';
+const TICK_CLR  = '#5a7d99';
+const BASE_OPTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 600 },
+};
+
+function axisStyle() {
+    return {
+        grid: { color: GRID_CLR },
+        ticks: { color: TICK_CLR, font: { size: 10 } }
+    };
+}
+
+function destroyChart(key) {
+    if (charts[key]) { charts[key].destroy(); delete charts[key]; }
+}
+
+/* ── Hourly bar ── */
+function renderHourly(hourly) {
+    destroyChart('hourly');
+    const ci = currentHourIdx(hourly);
+    charts.hourly = new Chart(document.getElementById('cHourly'), {
+        type: 'bar',
+        data: {
+            labels: HOURS,
+            datasets: [{
+                data: hourly.map(h => +h.total.toFixed(4)),
+                backgroundColor: hourly.map((h, i) =>
+                    i === ci        ? 'rgba(0,245,160,0.85)' :
+                    i < ci          ? 'rgba(0,212,255,0.6)'  :
+                                      'rgba(255,255,255,0.1)'),
+                borderColor: hourly.map((h, i) =>
+                    i === ci ? '#00f5a0' : i < ci ? '#00d4ff' : 'rgba(255,255,255,0.15)'),
+                borderWidth: 2,
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            ...BASE_OPTS,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => `${c.parsed.y.toFixed(4)} tons` } }
+            },
+            scales: { x: axisStyle(), y: { ...axisStyle(), ticks: { ...axisStyle().ticks, callback: v => v.toFixed(2) + 't' } } }
+        }
+    });
+}
+
+/* ── Cumulative line ── */
+function renderCumul(hourly) {
+    destroyChart('cumul');
+    let cum = 0;
+    const cumData = hourly.map(h => { cum += h.total; return +cum.toFixed(4); });
+
+    charts.cumul = new Chart(document.getElementById('cCumul'), {
+        type: 'line',
+        data: {
+            labels: HOURS,
+            datasets: [{
+                label: 'Cumulative (tons)',
+                data: cumData,
+                borderColor: '#ffd700',
+                backgroundColor: 'rgba(255,215,0,0.08)',
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#ffd700',
+                pointRadius: 5,
+                pointHoverRadius: 7,
+            }]
+        },
+        options: {
+            ...BASE_OPTS,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => `${c.parsed.y.toFixed(4)} tons` } }
+            },
+            scales: { x: axisStyle(), y: { ...axisStyle(), ticks: { ...axisStyle().ticks, callback: v => v.toFixed(2) + 't' } } }
+        }
+    });
+}
+
+/* ── Stacked VTCS vs Manual ── */
+function renderStacked(hourly) {
+    destroyChart('stacked');
+    charts.stacked = new Chart(document.getElementById('cStacked'), {
+        type: 'bar',
+        data: {
+            labels: HOURS,
+            datasets: [
+                {
+                    label: 'VTCS (tons)',
+                    data: hourly.map(h => +h.vtcs.toFixed(4)),
+                    backgroundColor: 'rgba(0,212,255,0.75)',
+                    borderRadius: 4,
+                },
+                {
+                    label: 'Manual (tons)',
+                    data: hourly.map(h => +h.manual.toFixed(4)),
+                    backgroundColor: 'rgba(255,140,0,0.75)',
+                    borderRadius: 4,
+                }
+            ]
+        },
+        options: {
+            ...BASE_OPTS,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12, padding: 14 }
+                },
+                tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(4)} t` } }
+            },
+            scales: {
+                x: { ...axisStyle(), stacked: true },
+                y: { ...axisStyle(), stacked: true, ticks: { ...axisStyle().ticks, callback: v => v.toFixed(2) + 't' } }
+            }
+        }
+    });
+}
+
+/* ── Tehsil doughnut ── */
+function renderTehsilChart(tehsilTotals) {
+    destroyChart('tehsil');
+    charts.tehsil = new Chart(document.getElementById('cTehsil'), {
+        type: 'doughnut',
+        data: {
+            labels: tehsilTotals.map(t => t.name),
+            datasets: [{
+                data: tehsilTotals.map(t => +t.total.toFixed(4)),
+                backgroundColor: PALETTE.map(c => c + 'bb'),
+                borderColor:     PALETTE,
+                borderWidth: 2,
+                hoverOffset: 8,
+            }]
+        },
+        options: {
+            ...BASE_OPTS,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { color: '#94a3b8', font: { size: 11 }, padding: 14, boxWidth: 12 }
+                },
+                tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed.toFixed(4)} t` } }
+            }
+        }
+    });
+}
+
+/* ── Table ── */
+function renderTable(tehsilTotals) {
+    const grand = tehsilTotals.reduce((s, t) => s + t.total, 0);
+    const grandVtcs = tehsilTotals.reduce((s, t) => s + t.vtcs, 0);
+    const grandMan  = tehsilTotals.reduce((s, t) => s + t.manual, 0);
+
+    const rows = tehsilTotals.map((t, i) => {
+        const pct = grand > 0 ? (t.total / grand * 100) : 0;
+        return `<tr>
+            <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${PALETTE[i % PALETTE.length]};margin-right:8px;vertical-align:middle"></span><strong>${t.name}</strong></td>
+            <td>${t.vtcs.toFixed(4)}</td>
+            <td>${(t.vtcs * 1000).toFixed(1)} KG</td>
+            <td>${t.manual.toFixed(4)}</td>
+            <td>${(t.manual * 1000).toFixed(1)} KG</td>
+            <td><strong>${t.total.toFixed(4)}</strong></td>
+            <td>${pct.toFixed(1)}%</td>
+            <td><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('tableWrap').innerHTML = `
+    <table>
+        <thead>
+            <tr>
+                <th>Tehsil</th>
+                <th>VTCS (tons)</th>
+                <th>VTCS (KG)</th>
+                <th>Manual (tons)</th>
+                <th>Manual (KG)</th>
+                <th>Total (tons)</th>
+                <th>Share %</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+            <tr>
+                <td>Grand Total</td>
+                <td>${grandVtcs.toFixed(4)}</td>
+                <td>${(grandVtcs * 1000).toFixed(1)} KG</td>
+                <td>${grandMan.toFixed(4)}</td>
+                <td>${(grandMan * 1000).toFixed(1)} KG</td>
+                <td>${grand.toFixed(4)}</td>
+                <td>100%</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>`;
+}
+
+/* ──────────────────────────────────────────
+   MAIN LOAD
+──────────────────────────────────────────── */
+async function loadData() {
+    document.getElementById('errorBox').style.display = 'none';
+    document.getElementById('lastUpdated').textContent = 'Refreshing…';
+
+    try {
+        const [table, table2] = await Promise.all([
+            fetchSheet(),          // Sheet1 — hourly data
+            fetchSheet('Sheet2'),  // Sheet2 — 3-day summary
+        ]);
+        const { hourly, tehsilTotals } = parseSheet(table);
+        const days = parseSheet2(table2);
+
+        renderKPIs(hourly);
+        renderEidDays(days);
+        renderHourly(hourly);
+        renderCumul(hourly);
+        renderStacked(hourly);
+        renderTehsilChart(tehsilTotals);
+        renderTable(tehsilTotals);
+
+        const now = new Date();
+        document.getElementById('lastUpdated').textContent =
+            `Last updated: ${now.toLocaleTimeString('en-PK')}`;
+        document.getElementById('currentDate').textContent =
+            now.toLocaleDateString('en-PK', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+    } catch (err) {
+        console.error(err);
+        const box = document.getElementById('errorBox');
+        box.style.display = 'block';
+        box.textContent = `⚠️ Could not load data: ${err.message}. Ensure the Google Sheet is set to "Anyone with the link can view".`;
+        document.getElementById('lastUpdated').textContent = 'Error — see above';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+    setInterval(loadData, 5 * 60 * 1000);   // auto-refresh every 5 minutes
+});
+</script>
+</body>
+</html>
