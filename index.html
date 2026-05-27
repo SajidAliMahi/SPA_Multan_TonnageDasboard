@@ -297,7 +297,7 @@
     <header>
         <div class="header-left">
             <h1 id="mainTitle">🗑️ Waste Collection Dashboard</h1>
-            <p>Multan District &nbsp;•&nbsp; Live data from Google Sheets &nbsp;•&nbsp; Auto-refresh every 5 min</p>
+            <p>Multan District &nbsp;•&nbsp; Live data from Google Sheets &nbsp;•&nbsp; Auto-refresh every 1 min</p>
         </div>
         <div class="header-right">
             <div id="currentDate">—</div>
@@ -910,7 +910,7 @@ async function loadData() {
 document.addEventListener('DOMContentLoaded', () => {
     applyEidTitle();
     loadData();
-    setInterval(loadData, 5 * 60 * 1000);   // auto-refresh every 5 minutes
+    setInterval(loadData, 60 * 1000);   // auto-refresh every 1 minute
 });
 </script>
 </body>
