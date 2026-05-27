@@ -497,16 +497,41 @@ function parseSheet2(table) {
     });
 }
 
-function renderEidDays(days) {
+/* Returns 0/1/2 if today is Eid Day 1/2/3, -1 otherwise */
+function getTodayEidIndex() {
+    const keys  = Object.keys(EID_DAYS);   // ['2026-05-27','2026-05-28','2026-05-29']
+    const today = new Date();
+    const key   = today.getFullYear() + '-'
+                + String(today.getMonth() + 1).padStart(2, '0') + '-'
+                + String(today.getDate()).padStart(2, '0');
+    return keys.indexOf(key);
+}
+
+function renderEidDays(days, todayIdx, kpiTotals) {
     days.forEach((day, i) => {
         const n = i + 1;
-        const hasData = day.vtcs > 0 || day.manKg > 0;
+        let vtcs, manual, manKg, total;
+
+        if (i === todayIdx && kpiTotals) {
+            // Today's EID box → use live Sheet1 Total Collected (not Sheet2)
+            vtcs   = kpiTotals.grandVtcs;
+            manual = kpiTotals.grandMan;
+            manKg  = manual * 1000;
+            total  = kpiTotals.grandTotal;
+        } else {
+            vtcs   = day.vtcs;
+            manual = day.manual;
+            manKg  = day.manKg;
+            total  = day.total;
+        }
+
+        const hasData = total > 0;
         document.getElementById(`kDay${n}Total`).textContent =
-            hasData ? day.total.toFixed(3) : '—';
+            hasData ? total.toFixed(3) : '—';
         document.getElementById(`kDay${n}Vtcs`).textContent =
-            hasData ? day.vtcs.toFixed(3) + ' t' : 'No data yet';
+            hasData ? vtcs.toFixed(3) + ' t' : 'No data yet';
         document.getElementById(`kDay${n}Man`).textContent  =
-            hasData ? day.manual.toFixed(4) + ' t  (' + day.manKg.toFixed(1) + ' KG)' : 'No data yet';
+            hasData ? manual.toFixed(4) + ' t  (' + manKg.toFixed(1) + ' KG)' : 'No data yet';
     });
 }
 
@@ -588,36 +613,43 @@ function currentHourIdx(hourly) {
 function renderKPIs(hourly) {
     const ci       = currentHourIdx(hourly);
     const cur      = hourly[ci];
+    const prevSlot = ci > 0 ? hourly[ci - 1] : { vtcs: 0, manual: 0, total: 0 };
 
-    // Previous = all completed hours before current
-    const prevVtcs = hourly.slice(0, ci).reduce((s, h) => s + h.vtcs, 0);
-    const prevMan  = hourly.slice(0, ci).reduce((s, h) => s + h.manual, 0);
-    const prevTons = prevVtcs + prevMan;
+    // Current Hour = current slot MINUS the immediately preceding slot (net increment)
+    const curVtcs  = cur.vtcs   - prevSlot.vtcs;
+    const curMan   = cur.manual - prevSlot.manual;
+    const curTotal = curVtcs + curMan;
 
-    // Grand total
-    const grandVtcs = hourly.reduce((s, h) => s + h.vtcs, 0);
-    const grandMan  = hourly.reduce((s, h) => s + h.manual, 0);
-    const grandTon  = grandVtcs + grandMan;
+    // Previous Hours Accumulative = sum of every slot BEFORE current
+    const prevVtcs  = hourly.slice(0, ci).reduce((s, h) => s + h.vtcs,   0);
+    const prevMan   = hourly.slice(0, ci).reduce((s, h) => s + h.manual, 0);
+    const prevTotal = prevVtcs + prevMan;
+
+    // Total Collected = Difference (current − previous slot) + Previous Hours sum
+    const grandVtcs  = curVtcs  + prevVtcs;
+    const grandMan   = curMan   + prevMan;
+    const grandTotal = grandVtcs + grandMan;
 
     // ── Current Hour card ──
     document.getElementById('kCurLabel').textContent = HOURS[ci];
     document.getElementById('kCurSub').textContent   =
         `Slot ${ci + 1} / ${HOURS.length}  •  ${cur.hasData ? 'Data received' : 'Awaiting data'}`;
-    document.getElementById('kCurTotal').textContent = cur.total.toFixed(3);
-    document.getElementById('kCurVtcs').textContent  = cur.vtcs.toFixed(3) + ' t';
-    document.getElementById('kCurMan').textContent   = cur.manual.toFixed(4) + ' t  (' + (cur.manual * 1000).toFixed(1) + ' KG)';
+    document.getElementById('kCurTotal').textContent = curTotal.toFixed(3);
+    document.getElementById('kCurVtcs').textContent  = curVtcs.toFixed(3) + ' t';
+    document.getElementById('kCurMan').textContent   = curMan.toFixed(4) + ' t  (' + (curMan * 1000).toFixed(1) + ' KG)';
 
     // ── Previous Hours card ──
-    document.getElementById('kPrevTotal').textContent = prevTons.toFixed(3);
+    document.getElementById('kPrevTotal').textContent = prevTotal.toFixed(3);
     document.getElementById('kPrevVtcs').textContent  = prevVtcs.toFixed(3) + ' t';
     document.getElementById('kPrevMan').textContent   = prevMan.toFixed(4) + ' t  (' + (prevMan * 1000).toFixed(1) + ' KG)';
 
     // ── Grand Total card ──
-    document.getElementById('kGrandTotal').textContent = grandTon.toFixed(3);
+    document.getElementById('kGrandTotal').textContent = grandTotal.toFixed(3);
     document.getElementById('kGrandVtcs').textContent  = grandVtcs.toFixed(3) + ' t';
     document.getElementById('kGrandMan').textContent   = grandMan.toFixed(4) + ' t  (' + (grandMan * 1000).toFixed(1) + ' KG)';
 
-    // EID Day cards are populated separately by renderEidDays() from Sheet2
+    // Return totals so loadData() can pass them to EID day cards
+    return { curVtcs, curMan, curTotal, prevVtcs, prevMan, prevTotal, grandVtcs, grandMan, grandTotal };
 }
 
 /* ──────────────────────────────────────────
@@ -776,16 +808,22 @@ function renderTehsilChart(tehsilTotals) {
 
 /* ── Table ── */
 function renderTable(tehsilTotals, hourly) {
-    const ci  = currentHourIdx(hourly);
-    const cur = hourly[ci];
+    const ci       = currentHourIdx(hourly);
+    const cur      = hourly[ci];
+    const prevSlot = ci > 0 ? hourly[ci - 1] : null;
 
     // Build per-tehsil current-hour / previous-hours / total breakdown
     const tehsilData = tehsilTotals.map((t, i) => {
-        const curVtcs  = cur.byTehsil[i].vtcs;
-        const curMan   = cur.byTehsil[i].manual;
+        // Current Hour = current slot minus immediately preceding slot (net increment)
+        const curVtcs  = cur.byTehsil[i].vtcs   - (prevSlot ? prevSlot.byTehsil[i].vtcs   : 0);
+        const curMan   = cur.byTehsil[i].manual  - (prevSlot ? prevSlot.byTehsil[i].manual : 0);
+        // Previous Hours = sum of all slots before current
         const prevVtcs = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].vtcs,   0);
         const prevMan  = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].manual, 0);
-        return { name: t.name, curVtcs, curMan, prevVtcs, prevMan, totVtcs: t.vtcs, totMan: t.manual };
+        // Total = Difference + Previous Hours
+        const totVtcs  = curVtcs  + prevVtcs;
+        const totMan   = curMan   + prevMan;
+        return { name: t.name, curVtcs, curMan, prevVtcs, prevMan, totVtcs, totMan };
     });
 
     // Footer totals
@@ -849,8 +887,8 @@ async function loadData() {
         const { hourly, tehsilTotals } = parseSheet(table);
         const days = parseSheet2(table2);
 
-        renderKPIs(hourly);
-        renderEidDays(days);
+        const kpiTotals = renderKPIs(hourly);
+        renderEidDays(days, getTodayEidIndex(), kpiTotals);
         renderHourly(hourly);
         renderCumul(hourly);
         renderStacked(hourly);
