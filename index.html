@@ -608,22 +608,20 @@ function currentHourIdx(hourly) {
    KPI CARDS
 ──────────────────────────────────────────── */
 function renderKPIs(hourly) {
-    const ci       = currentHourIdx(hourly);
-    const cur      = hourly[ci];
-    const prevSlot = ci > 0 ? hourly[ci - 1] : { vtcs: 0, manual: 0, total: 0 };
+    const ci  = currentHourIdx(hourly);
+    const cur = hourly[ci];
 
-    // Current Hour = current slot MINUS the immediately preceding slot (net increment)
-    // Clamp to 0 — never show negative when current hour data not yet entered
-    const curVtcs  = Math.max(0, cur.vtcs   - prevSlot.vtcs);
-    const curMan   = Math.max(0, cur.manual - prevSlot.manual);
+    // Current Hour = raw tonnage collected in this hour only
+    const curVtcs  = cur.vtcs;
+    const curMan   = cur.manual;
     const curTotal = curVtcs + curMan;
 
-    // Previous Hours Accumulative = sum of every slot BEFORE current
+    // Previous Hours = sum of all slots before current
     const prevVtcs  = hourly.slice(0, ci).reduce((s, h) => s + h.vtcs,   0);
     const prevMan   = hourly.slice(0, ci).reduce((s, h) => s + h.manual, 0);
     const prevTotal = prevVtcs + prevMan;
 
-    // Total Collected = Difference (current − previous slot) + Previous Hours sum
+    // Total Collected = Current Hour + Previous Hours
     const grandVtcs  = curVtcs  + prevVtcs;
     const grandMan   = curMan   + prevMan;
     const grandTotal = grandVtcs + grandMan;
@@ -806,20 +804,18 @@ function renderTehsilChart(tehsilTotals) {
 
 /* ── Table ── */
 function renderTable(tehsilTotals, hourly) {
-    const ci       = currentHourIdx(hourly);
-    const cur      = hourly[ci];
-    const prevSlot = ci > 0 ? hourly[ci - 1] : null;
+    const ci  = currentHourIdx(hourly);
+    const cur = hourly[ci];
 
     // Build per-tehsil current-hour / previous-hours / total breakdown
     const tehsilData = tehsilTotals.map((t, i) => {
-        // Current Hour = current slot minus immediately preceding slot (net increment)
-        // Clamp to 0 — never show negative when current hour data not yet entered
-        const curVtcs  = Math.max(0, cur.byTehsil[i].vtcs   - (prevSlot ? prevSlot.byTehsil[i].vtcs   : 0));
-        const curMan   = Math.max(0, cur.byTehsil[i].manual  - (prevSlot ? prevSlot.byTehsil[i].manual : 0));
+        // Current Hour = raw tonnage for this hour only
+        const curVtcs  = cur.byTehsil[i].vtcs;
+        const curMan   = cur.byTehsil[i].manual;
         // Previous Hours = sum of all slots before current
         const prevVtcs = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].vtcs,   0);
         const prevMan  = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].manual, 0);
-        // Total = Difference + Previous Hours
+        // Total = Current + Previous
         const totVtcs  = curVtcs  + prevVtcs;
         const totMan   = curMan   + prevMan;
         return { name: t.name, curVtcs, curMan, prevVtcs, prevMan, totVtcs, totMan };
