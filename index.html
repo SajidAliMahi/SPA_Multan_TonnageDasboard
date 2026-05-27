@@ -451,12 +451,10 @@ function applyEidTitle() {
 ──────────────────────────────────────────── */
 const SHEET_ID = '1x0gZH0z2Z9D4KAzXV7AgZVN6B9uh4NvfZYrm3hp_m7w';
 
-const HOURS = [
-    '10 AM','11 AM','12 PM','1 PM',
-    '2 PM','3 PM','4 PM','5 PM',
-    '6 PM','7 PM','8 PM','9 PM'
-];
-const HOUR_24 = [10,11,12,13,14,15,16,17,18,19,20,21];
+// Populated dynamically from the sheet — no need to change these when adding columns
+let HOURS   = [];
+let HOUR_24 = [];
+
 
 const PALETTE = ['#00d4ff','#00f5a0','#ffd700','#ff8c00','#a78bfa'];
 let charts = {};
@@ -539,7 +537,25 @@ function cellVal(row, idx) {
 }
 
 function parseSheet(table) {
+    const cols = table.cols || [];
     const rows = table.rows || [];
+
+    // ── Auto-detect hours from sheet column count ────────────────────────────
+    // Structure: col0=Tehsil, then pairs [VTCS, Manual] per hour — any count
+    // Labels are generated sequentially starting 10 AM so adding new column
+    // pairs is picked up automatically without any code change.
+    const START_HOUR = 10;   // collection starts at 10 AM
+    const numHours   = Math.floor((cols.length - 1) / 2);
+    HOURS   = [];
+    HOUR_24 = [];
+    for (let h = 0; h < numHours; h++) {
+        const h24 = START_HOUR + h;
+        HOUR_24.push(h24);
+        if      (h24 < 12)  HOURS.push(`${h24} AM`);
+        else if (h24 === 12) HOURS.push('12 PM');
+        else                 HOURS.push(`${h24 - 12} PM`);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Skip the "Hourly Total" summary row
     const tehsilRows = rows.filter(r => {
@@ -549,11 +565,9 @@ function parseSheet(table) {
 
     const tehsilNames = tehsilRows.map(r => r.c[0].v);
 
-    // 12 hourly slots, each has 2 columns: [VTCS tons, Manual KG]
+    // Hourly slots — count driven by sheet columns, not hardcoded
     const hourly = HOURS.map((label, h) => {
-        // Sheet now has all columns populated: standard 2-col-per-hour layout
-        // VTCS at col 1,3,5,7... → 1 + h*2
-        // Manual(KG) at col 2,4,6,8... → 2 + h*2
+        // VTCS at col 1,3,5… → 1 + h*2   |   Manual(KG) at col 2,4,6… → 2 + h*2
         const vtcsCol   = 1 + h * 2;
         const manualCol = 2 + h * 2;
         let sumVtcs = 0, sumManualTons = 0;
