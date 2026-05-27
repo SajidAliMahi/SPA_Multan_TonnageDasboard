@@ -508,30 +508,27 @@ function getTodayEidIndex() {
 }
 
 function renderEidDays(days, todayIdx, kpiTotals) {
-    days.forEach((day, i) => {
+    // All three EID day boxes use Sheet1 Total Collected (live data).
+    // Only the box matching today's date receives data; others show — until their day arrives.
+    [0, 1, 2].forEach(i => {
         const n = i + 1;
-        let vtcs, manual, manKg, total;
+        let vtcs = 0, manual = 0, manKg = 0, total = 0;
 
         if (i === todayIdx && kpiTotals) {
-            // Today's EID box → use live Sheet1 Total Collected (not Sheet2)
             vtcs   = kpiTotals.grandVtcs;
             manual = kpiTotals.grandMan;
             manKg  = manual * 1000;
             total  = kpiTotals.grandTotal;
-        } else {
-            vtcs   = day.vtcs;
-            manual = day.manual;
-            manKg  = day.manKg;
-            total  = day.total;
         }
+        // Other EID days: display — until that date is reached and Sheet1 has data
 
         const hasData = total > 0;
         document.getElementById(`kDay${n}Total`).textContent =
             hasData ? total.toFixed(3) : '—';
         document.getElementById(`kDay${n}Vtcs`).textContent =
-            hasData ? vtcs.toFixed(3) + ' t' : 'No data yet';
+            hasData ? vtcs.toFixed(3) + ' t' : '—';
         document.getElementById(`kDay${n}Man`).textContent  =
-            hasData ? manual.toFixed(4) + ' t  (' + manKg.toFixed(1) + ' KG)' : 'No data yet';
+            hasData ? manual.toFixed(4) + ' t  (' + manKg.toFixed(1) + ' KG)' : '—';
     });
 }
 
