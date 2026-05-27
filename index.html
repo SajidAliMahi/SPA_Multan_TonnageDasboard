@@ -608,12 +608,13 @@ function currentHourIdx(hourly) {
    KPI CARDS
 ──────────────────────────────────────────── */
 function renderKPIs(hourly) {
-    const ci  = currentHourIdx(hourly);
-    const cur = hourly[ci];
+    const ci       = currentHourIdx(hourly);
+    const cur      = hourly[ci];
+    const prevSlot = ci > 0 ? hourly[ci - 1] : { vtcs: 0, manual: 0 };
 
-    // Current Hour = raw tonnage collected in this hour only
-    const curVtcs  = cur.vtcs;
-    const curMan   = cur.manual;
+    // Current Hour = current column value − previous column value (clamp to 0 if not yet entered)
+    const curVtcs  = Math.max(0, cur.vtcs   - prevSlot.vtcs);
+    const curMan   = Math.max(0, cur.manual - prevSlot.manual);
     const curTotal = curVtcs + curMan;
 
     // Previous Hours = sum of all slots before current
@@ -804,14 +805,15 @@ function renderTehsilChart(tehsilTotals) {
 
 /* ── Table ── */
 function renderTable(tehsilTotals, hourly) {
-    const ci  = currentHourIdx(hourly);
-    const cur = hourly[ci];
+    const ci       = currentHourIdx(hourly);
+    const cur      = hourly[ci];
+    const prevSlot = ci > 0 ? hourly[ci - 1] : null;
 
     // Build per-tehsil current-hour / previous-hours / total breakdown
     const tehsilData = tehsilTotals.map((t, i) => {
-        // Current Hour = raw tonnage for this hour only
-        const curVtcs  = cur.byTehsil[i].vtcs;
-        const curMan   = cur.byTehsil[i].manual;
+        // Current Hour = current column − previous column (clamp to 0 if not yet entered)
+        const curVtcs  = Math.max(0, cur.byTehsil[i].vtcs    - (prevSlot ? prevSlot.byTehsil[i].vtcs   : 0));
+        const curMan   = Math.max(0, cur.byTehsil[i].manual   - (prevSlot ? prevSlot.byTehsil[i].manual : 0));
         // Previous Hours = sum of all slots before current
         const prevVtcs = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].vtcs,   0);
         const prevMan  = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].manual, 0);
