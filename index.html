@@ -613,8 +613,9 @@ function renderKPIs(hourly) {
     const prevSlot = ci > 0 ? hourly[ci - 1] : { vtcs: 0, manual: 0, total: 0 };
 
     // Current Hour = current slot MINUS the immediately preceding slot (net increment)
-    const curVtcs  = cur.vtcs   - prevSlot.vtcs;
-    const curMan   = cur.manual - prevSlot.manual;
+    // Clamp to 0 — never show negative when current hour data not yet entered
+    const curVtcs  = Math.max(0, cur.vtcs   - prevSlot.vtcs);
+    const curMan   = Math.max(0, cur.manual - prevSlot.manual);
     const curTotal = curVtcs + curMan;
 
     // Previous Hours Accumulative = sum of every slot BEFORE current
@@ -812,8 +813,9 @@ function renderTable(tehsilTotals, hourly) {
     // Build per-tehsil current-hour / previous-hours / total breakdown
     const tehsilData = tehsilTotals.map((t, i) => {
         // Current Hour = current slot minus immediately preceding slot (net increment)
-        const curVtcs  = cur.byTehsil[i].vtcs   - (prevSlot ? prevSlot.byTehsil[i].vtcs   : 0);
-        const curMan   = cur.byTehsil[i].manual  - (prevSlot ? prevSlot.byTehsil[i].manual : 0);
+        // Clamp to 0 — never show negative when current hour data not yet entered
+        const curVtcs  = Math.max(0, cur.byTehsil[i].vtcs   - (prevSlot ? prevSlot.byTehsil[i].vtcs   : 0));
+        const curMan   = Math.max(0, cur.byTehsil[i].manual  - (prevSlot ? prevSlot.byTehsil[i].manual : 0));
         // Previous Hours = sum of all slots before current
         const prevVtcs = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].vtcs,   0);
         const prevMan  = hourly.slice(0, ci).reduce((s, h) => s + h.byTehsil[i].manual, 0);
