@@ -455,6 +455,17 @@ const SHEET_ID = '1x0gZH0z2Z9D4KAzXV7AgZVN6B9uh4NvfZYrm3hp_m7w';
 let HOURS   = [];
 let HOUR_24 = [];
 
+// Extract 24-h integer from labels like "09:00AM", "10 AM", "1:00PM VTCS", etc.
+function extractHour24(label) {
+    const m = (label || '').match(/(\d{1,2})(?::\d{2})?\s*(AM|PM)/i);
+    if (!m) return -1;
+    let h = parseInt(m[1]);
+    const ampm = m[2].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h;
+}
+
 
 const PALETTE = ['#00d4ff','#00f5a0','#ffd700','#ff8c00','#a78bfa'];
 let charts = {};
@@ -540,20 +551,20 @@ function parseSheet(table) {
     const cols = table.cols || [];
     const rows = table.rows || [];
 
-    // ── Auto-detect hours from sheet column count ────────────────────────────
+    // ── Auto-detect hours from sheet column count + first column label ───────
     // Structure: col0=Tehsil, then pairs [VTCS, Manual] per hour — any count
-    // Labels are generated sequentially starting 10 AM so adding new column
-    // pairs is picked up automatically without any code change.
-    const START_HOUR = 10;   // collection starts at 10 AM
-    const numHours   = Math.floor((cols.length - 1) / 2);
+    const numHours  = Math.floor((cols.length - 1) / 2);
+    const startH24  = extractHour24(cols[1]?.label || '');   // read start time from sheet
+    const START_HOUR = startH24 >= 0 ? startH24 : 9;         // fallback 9 AM
     HOURS   = [];
     HOUR_24 = [];
     for (let h = 0; h < numHours; h++) {
         const h24 = START_HOUR + h;
         HOUR_24.push(h24);
-        if      (h24 < 12)  HOURS.push(`${h24} AM`);
-        else if (h24 === 12) HOURS.push('12 PM');
-        else                 HOURS.push(`${h24 - 12} PM`);
+        if      (h24 === 0 || h24 === 24) HOURS.push('12 AM');
+        else if (h24 < 12)                HOURS.push(`${h24} AM`);
+        else if (h24 === 12)              HOURS.push('12 PM');
+        else                              HOURS.push(`${h24 - 12} PM`);
     }
     // ─────────────────────────────────────────────────────────────────────────
 
